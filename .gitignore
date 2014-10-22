@@ -1,0 +1,4 @@
+*.pyc
+.git
+rt_key
+log/overtime
