@@ -3,8 +3,22 @@
 
 from rescuetime.api.service import Service
 from rescuetime.api.access import AnalyticApiKey
+# official API documentation is here https://www.rescuetime.com/anapi/setup/documentation
+import datetime,sys,os
+from pprint import PrettyPrinter
+from collections import defaultdict
 
-class activity:
+def test():
+    print "RescueTime class TEST"
+    rt = RescueTime(beginDay="20141015",endDay="20141019")
+    pp = PrettyPrinter()
+    print "confirm what raw data are"
+    pp.pprint(rt.jsonRawData)
+    print "getAllData"
+    rt.getAllData([["Twitter","Twitter for Android"],["Hulu"]],["2","-1"],["General Software Development"])
+
+
+class Activity:
     def __init__(self,data):
         self.date = data[0]
         self.timespent = int(data[1])
@@ -13,71 +27,115 @@ class activity:
         self.category = data[4]
         self.productivity = str(data[5]) #-2,-1,0,1,2
  
-class rescuejson:
+class RescueJSONParser:
     def __init__(self,fetch_data):
-        self.today_activity_dic = dict()
-        self.today_productivity_dic = dict()
-        self.today_category_dic = dict()
+        self.activityDic = defaultdict(lambda:defaultdict(float))
+        self.productivityDic = defaultdict(lambda:defaultdict(float))
+        self.categoryDic = defaultdict(lambda:defaultdict(float))
 
         for act in fetch_data['rows']:
-            a = activity(act)
+            a = Activity(act)
+            date = datetime.datetime.strptime(a.date[0:10],"%Y-%m-%d").strftime("%Y%m%d")
 
-            if a.activity in self.today_activity_dic:
-                self.today_activity_dic[a.activity] += a.timespent
-            else:
-                self.today_activity_dic[a.activity] = a.timespent
+            self.activityDic[date][a.activity] += a.timespent
+            self.productivityDic[date][a.productivity] += a.timespent
+            self.categoryDic[date][a.category] += a.timespent
 
-            if a.productivity in self.today_productivity_dic:
-                self.today_productivity_dic[a.productivity] += a.timespent
-            else:
-                self.today_productivity_dic[a.productivity] = a.timespent
-            if a.category in self.today_category_dic:
-                self.today_category_dic[a.category] += a.timespent
-            else:
-                self.today_category_dic[a.category] = a.timespent
+    def activityTime(self,date,activityName):
+        if date in self.activityDic and activityName in self.activityDic[date]:
+            return self.activityDic[date][activityName]
+        else:
+            return 0.0
 
-    def activity_time(self,activity_name):
-        return self.today_activity_dic[activity_name]
+    def productivityTime(self,date,productivityNumber):
+        if date in self.productivityDic and productivityNumber in self.productivityDic[date]:
+            return self.productivityDic[date][productivityNumber]
+        else:
+            return 0.0
 
-    def productivity_time(self,productivity_number):
-        return self.today_productivity_dic[productivity_number]
+    def categoryTime(self,date,categoryName):
+        if date in self.categoryDic and categoryName in self.categoryDic[date]:
+            return self.categoryDic[date][categoryName]
+        else:
+            return 0.0
 
-    def category_time(self,category_name):
-        return self.today_category_dic[category_name]
+    def fetchAllData(self,dateList,activityGroupList,productivityList,categoryGroupList):
+        for date in dateList:
+            output = []
+            for activityGroup in activityGroupList:
+                sec = 0
+                for activity in activityGroup:
+                    sec += self.activityTime(date,activity)
+                output.append(sec)
 
-class rescuetime:
-    def __init__(self):
-        s = Service.Service()
-        k = AnalyticApiKey.AnalyticApiKey(open('/home/ysuzuki/MyApplication/rescueapp/rt_key').read(), s)
-        p = {}
+            for productivity in productivityList:
+                output.append(self.productivityTime(date,productivity))
+
+            for categoryGroup in categoryGroupList:
+                sec = 0
+                for category in categoryGroup:
+                    sec += self.categoryTime(date,category)
+                output.append(sec)
+
+            yield output
+
+class RescueTime:
+    def __init__(self,beginDay=None,endDay=None):
+        service = Service.Service()
+        key = AnalyticApiKey.AnalyticApiKey(open('/home/ysuzuki/MyApplication/rescueapp/rt_key').read(), service)
+        parameters = {}
     
-        p['restrict_kind']  = 'activity'
-        p['perspective']    = 'interval'
-        d = s.fetch_data(k,p)
-        #pp = pprint.PrettyPrinter()
-        #pp.pprint(d)
-    
-        self.todaydata = rescuejson(d)
+        parameters['restrict_kind']  = 'activity'
+        #parameters['restrict_kind']  = 'category'
+        parameters['perspective']    = 'interval'
 
-    def gettime(self,activity_name_list):
+        self.beginDay = beginDay
+        self.endDay = endDay
+        self.beginDatetime = datetime.datetime.strptime(beginDay,"%Y%m%d")
+        self.endDatetime = datetime.datetime.strptime(endDay,"%Y%m%d")
+        self.dateList = []
+        for plusDays in range((self.endDatetime-self.beginDatetime).days+1):
+            self.dateList.append((self.beginDatetime+datetime.timedelta(days=plusDays)).strftime("%Y%m%d"))
+
+        if beginDay:
+            parameters["restrict_begin"] = beginDay[0:4] + "-" + beginDay[4:6] + "-" + beginDay[6:8] # %Y%m%d -> %Y-%m-%d
+        else:
+            parameters["restrict_begin"] = datetime.datetime.today().strftime("%Y-%m-%d")
+
+        if endDay:
+            parameters["restrict_end"] = endDay[0:4] + "-" + endDay[4:6] + "-" + endDay[6:8] # %Y%m%d -> %Y-%m-%d
+        else:
+            parameters["restrict_end"] = datetime.datetime.today().strftime("%Y-%m-%d")
+        
+        self.jsonRawData = service.fetch_data(key,parameters)    
+        self.data = RescueJSONParser(self.jsonRawData)
+
+    def getTime(self,date,activityNameList):
         sec = 0
-        for activity_name in activity_name_list:
+        for activityName in activityNameList:
             try:
-                sec += self.todaydata.activity_time(activity_name)
+                sec += self.data.activityTime(date,activityName)
             except:
                 sec += 0
         return sec
 
-    def productivity_gettime(self,productivity):
-        return self.todaydata.productivity_time(productivity)
+    def getProductivityTime(self,date,productivity):
+        return self.data.productivityTime(date,productivity)
 
-
-    def category_gettime(self,category_name_list):
+    def getCategoryTime(self,date,categoryNameList):
         sec = 0
-        for category_name in category_name_list:
+        for categoryName in categoryNameList:
             try:
-                sec += self.todaydata.category_time(category_name)
+                sec += self.data.categoryTime(date,categoryName)
             except:
                 sec += 0
         return sec
 
+    # ex. activityList = [["Twitter","Tween"],["Hulu","Youtube"]]
+    def getAllData(self,activityList,productivityList,categoryList):
+        for oneDayData in self.data.fetchAllData(self.dateList,activityList,productivityList,categoryList):
+            print oneDayData
+
+
+if __name__ == "__main__":
+    test()
