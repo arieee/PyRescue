@@ -26,19 +26,19 @@ def log_check(datestr,log_file_name,limit_minutes=None):
 
 class twitime_logger:
     def __init__(self):
-        rt = rtlib.rescuetime()
+
+        self.today = datetime.datetime.today().strftime("%Y%m%d")
+        rt = rtlib.RescueTime(beginDay=self.today,endDay=self.today)
         twitter_client = ["Twitter","Twitter for Android","TweetDeck"]
         self.api = tweepy_basic.setup_ariapp()
-        self.today_twitime = rt.gettime(twitter_client)
+        self.today_twitime = rt.getTime(self.today,twitter_client)
 
         self.client_today_twitime = dict()
         for client in twitter_client:
             try:
-                self.client_today_twitime[client] = rt.gettime([client])
+                self.client_today_twitime[client] = rt.getTime([client])
             except:
-                self.client_today_twitime[cient] = 0
-
-        self.today = datetime.datetime.today().strftime("%Y%m%d")
+                self.client_today_twitime[client] = 0
 
     def today_spent_time(self):
         tweet = "@arieee0 今日あなたはtwitterに{:.1f}分費やしています…"\
