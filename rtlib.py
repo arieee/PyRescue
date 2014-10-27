@@ -90,28 +90,31 @@ class RescueTime:
         #parameters['restrict_kind']  = 'category'
         parameters['perspective']    = 'interval'
 
-        self.beginDay = beginDay
-        self.endDay = endDay
-        self.beginDatetime = datetime.datetime.strptime(beginDay,"%Y%m%d")
-        self.endDatetime = datetime.datetime.strptime(endDay,"%Y%m%d")
+        self.today = datetime.datetime.today().strftime("%Y%m%d")
+        if beginDay:
+            self.beginDay = beginDay
+        else:
+            self.beginDay = self.today
+
+        if endDay:
+            self.endDay = endDay
+        else:
+            self.endDay = self.today
+
+        parameters["restrict_begin"] = self.beginDay[0:4] + "-" + self.beginDay[4:6] + "-" + self.beginDay[6:8] # %Y%m%d -> %Y-%m-%d
+        parameters["restrict_end"] = self.endDay[0:4] + "-" + self.endDay[4:6] + "-" + self.endDay[6:8] # %Y%m%d -> %Y-%m-%d
+
+        self.beginDatetime = datetime.datetime.strptime(self.beginDay,"%Y%m%d")
+        self.endDatetime = datetime.datetime.strptime(self.endDay,"%Y%m%d")
         self.dateList = []
         for plusDays in range((self.endDatetime-self.beginDatetime).days+1):
             self.dateList.append((self.beginDatetime+datetime.timedelta(days=plusDays)).strftime("%Y%m%d"))
-
-        if beginDay:
-            parameters["restrict_begin"] = beginDay[0:4] + "-" + beginDay[4:6] + "-" + beginDay[6:8] # %Y%m%d -> %Y-%m-%d
-        else:
-            parameters["restrict_begin"] = datetime.datetime.today().strftime("%Y-%m-%d")
-
-        if endDay:
-            parameters["restrict_end"] = endDay[0:4] + "-" + endDay[4:6] + "-" + endDay[6:8] # %Y%m%d -> %Y-%m-%d
-        else:
-            parameters["restrict_end"] = datetime.datetime.today().strftime("%Y-%m-%d")
         
         self.jsonRawData = service.fetch_data(key,parameters)    
         self.data = RescueJSONParser(self.jsonRawData)
 
-    def getTime(self,date,activityNameList):
+    def getTime(self,activityNameList,date=None):
+        if not date: date = self.today
         sec = 0
         for activityName in activityNameList:
             try:
