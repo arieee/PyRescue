@@ -31,7 +31,7 @@ class twitime_logger:
         rt = rtlib.RescueTime(beginDay=self.today,endDay=self.today)
         twitter_client = ["Twitter","Twitter for Android","TweetDeck"]
         self.api = tweepy_basic.setup_ariapp()
-        self.today_twitime = rt.getTime(self.today,twitter_client)
+        self.today_twitime = rt.getTime(twitter_client,date=self.today)
 
         self.client_today_twitime = dict()
         for client in twitter_client:
