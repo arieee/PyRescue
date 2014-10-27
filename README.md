@@ -1,4 +1,4 @@
-# Python library to time data spent on various application easily from RescueTime API
+# Python library to get time data easily from RescueTime API
 
 official API documentation is here https://www.rescuetime.com/anapi/setup/documentation
 
